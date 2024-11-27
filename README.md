@@ -1,5 +1,5 @@
 # ChaoXingServerSeat
-超星图书馆座位预约脚本
+超星图书馆座位预约脚本（多线程版本）
 
 （由于部分学校新增了点选式行为验证码导致原本的程序会显示验证失败，详细参见issue21[https://github.com/bear-zd/ChaoXingReserveSeat/issues/21]）
 
@@ -43,19 +43,15 @@ pip install numpy, opencv-python
 
 由于脚本是检测系统时间为7点时进行预约（在main.py 第16行），如果有特殊要求可以修改。通过 `python main.py` 运行脚本, 添加参数 `-u config.json` 来指明配置文件路径
 
-运行`python main.py -m debug`可以立即运行查看配置是否正确。
-
-关于运行的方式，现在提供了多种运行方式：
-
-- Linux环境下：
-
-在Linux下可以使用如下方式添加crontab , 运行：`crontab -e`添加指令 :`0 7 * * * python3 main.py`
-
 - windows环境下：
 
 windows下使用时间任务:
 
 ![](https://zideapicbed.oss-cn-shanghai.aliyuncs.com/QQ%E5%9B%BE%E7%89%8720221120213736.png)
+
+请你用SYSTEM用户运行，设置无需用户登录执行
+
+注意在预约时间后1min内，启动该代码
 
 ### github actions部署方式（目前应该没有问题了）：
 
