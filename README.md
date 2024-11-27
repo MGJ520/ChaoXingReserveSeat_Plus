@@ -1,4 +1,4 @@
-# ChaoXingServerSeat
+# ChaoXingServerSeat——Plus
 超星图书馆座位预约脚本（多线程版本）
 
 （由于部分学校新增了点选式行为验证码导致原本的程序会显示验证失败，详细参见issue21[https://github.com/bear-zd/ChaoXingReserveSeat/issues/21]）
