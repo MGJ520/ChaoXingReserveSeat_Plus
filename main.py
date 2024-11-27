@@ -4,114 +4,94 @@ import time
 import argparse
 import os
 import logging
+
+from concurrent.futures import ThreadPoolExecutor
+from utils import reserve, get_user_credentials
+
+
+SLEEPTIME        = 0.5      # 每个用户每次抢座的间隔
+ENABLE_SLIDER    = False    # 是否有滑块验证
+MAX_ATTEMPT      = 30       # 每个用户最大尝试次数
+RESERVE_NEXT_DAY = True     # 预约明天而不是今天的
+
+
+# 配置日志的基本设置，设置日志级别为INFO，并定义日志的格式
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
-from utils import reserve, get_user_credentials
+# 定义一个lambda函数，用于获取当前时间，如果action为True，则获取的是UTC+8时区的时间，否则获取本地时间
 get_current_time = lambda action: time.strftime("%H:%M:%S", time.localtime(time.time() + 8*3600)) if action else time.strftime("%H:%M:%S", time.localtime(time.time()))
+# 定义一个lambda函数，用于获取当前是星期几，如果action为True，则获取的是UTC+8时区的时间对应的星期，否则获取本地时间对应的星期
 get_current_dayofweek = lambda action: time.strftime("%A", time.localtime(time.time() + 8*3600)) if action else time.strftime("%A", time.localtime(time.time()))
 
-
-SLEEPTIME = 0.2 # 每次抢座的间隔
-ENDTIME = "07:01:00" # 根据学校的预约座位时间+1min即可
-
-ENABLE_SLIDER = False # 是否有滑块验证
-MAX_ATTEMPT = 5 # 最大尝试次数
-RESERVE_NEXT_DAY = False # 预约明天而不是今天的
-
-                
-
-def login_and_reserve(users, usernames, passwords, action, success_list=None):
-    logging.info(f"Global settings: \nSLEEPTIME: {SLEEPTIME}\nENDTIME: {ENDTIME}\nENABLE_SLIDER: {ENABLE_SLIDER}\nRESERVE_NEXT_DAY: {RESERVE_NEXT_DAY}")
-    if action and len(usernames.split(",")) != len(users):
-        raise Exception("user number should match the number of config")
-    if success_list is None:
-        success_list = [False] * len(users)
+def login_and_reserve_single_user(user, username, password, action):
+    # 这里是单个用户登录并尝试预约的逻辑
+    # 解包用户信息，包括用户名、密码、预约时间、房间ID、座位ID和预约星期
+    username, password, times, roomid, seatid, daysofweek = user.values()
+    # 如果启用了action模式，则使用传入的用户名和密码
+    if action:
+        username, password = username, password
+    # 如果当前星期不在用户设置的预约星期中，则跳过
     current_dayofweek = get_current_dayofweek(action)
-    for index, user in enumerate(users):
-        username, password, times, roomid, seatid, daysofweek = user.values()
-        if action:
-            username, password = usernames.split(',')[index], passwords.split(',')[index]
-        if(current_dayofweek not in daysofweek):
-            logging.info("Today not set to reserve")
-            continue
-        if not success_list[index]: 
-            logging.info(f"----------- {username} -- {times} -- {seatid} try -----------")
-            s = reserve(sleep_time=SLEEPTIME, max_attempt=MAX_ATTEMPT, enable_slider=ENABLE_SLIDER, reserve_next_day=RESERVE_NEXT_DAY)
-            s.get_login_status()
-            s.login(username, password)
-            s.requests.headers.update({'Host': 'office.chaoxing.com'})
-            suc = s.submit(times, roomid, seatid, action)
-            success_list[index] = suc
-    return success_list
+    if (current_dayofweek not in daysofweek):
+        logging.error(f"[Time] -User {username} Today not set to reserve")
+        return False
+    # 尝试预约
+    logging.info(f"[Try] - {username} -- {times} -- {roomid} -- {seatid} ---- ")
+    s = reserve(sleep_time=SLEEPTIME, max_attempt=MAX_ATTEMPT, enable_slider=ENABLE_SLIDER,
+                reserve_next_day=RESERVE_NEXT_DAY)
+    s.get_login_status()
+    s.login(username, password)
+    s.requests.headers.update({'Host': 'office.chaoxing.com'})
+    suc = s.submit(times, roomid, seatid, action,username)
+    return suc
 
 
-def main(users, action=False):
-    current_time = get_current_time(action)
-    logging.info(f"start time {current_time}, action {'on' if action else 'off'}")
-    attempt_times = 0
+def main_parallel(users, action=False):
+    # 获取用户凭据，如果启用action模式
     usernames, passwords = None, None
     if action:
         usernames, passwords = get_user_credentials(action)
-    success_list = None
-    current_dayofweek = get_current_dayofweek(action)
-    today_reservation_num = sum(1 for d in users if current_dayofweek in d.get('daysofweek'))
-    while current_time < ENDTIME:
-        attempt_times += 1
-        # try:
-        success_list = login_and_reserve(users, usernames, passwords, action, success_list)
-        # except Exception as e:
-        #     print(f"An error occurred: {e}")
-        print(f"attempt time {attempt_times}, time now {current_time}, success list {success_list}")
-        current_time = get_current_time(action)
-        if sum(success_list) == today_reservation_num:
-            print(f"reserved successfully!")
-            return
 
-def debug(users, action=False):
-    logging.info(f"Global settings: \nSLEEPTIME: {SLEEPTIME}\nENDTIME: {ENDTIME}\nENABLE_SLIDER: {ENABLE_SLIDER}\nRESERVE_NEXT_DAY: {RESERVE_NEXT_DAY}")
-    suc = False
-    logging.info(f" Debug Mode start! , action {'on' if action else 'off'}")
-    if action:
-        usernames, passwords = get_user_credentials(action)
-    current_dayofweek = get_current_dayofweek(action)
-    for index, user in enumerate(users):
-        username, password, times, roomid, seatid, daysofweek = user.values()
-        if type(seatid) == str:
-            seatid = [seatid]
-        if action:
-            username ,password = usernames.split(',')[index], passwords.split(',')[index]
-        if(current_dayofweek not in daysofweek):
-            logging.info("Today not set to reserve")
-            continue
-        logging.info(f"----------- {username} -- {times} -- {seatid} try -----------")
-        s = reserve(sleep_time=SLEEPTIME,  max_attempt=MAX_ATTEMPT, enable_slider=ENABLE_SLIDER)
-        s.get_login_status()
-        s.login(username, password)
-        s.requests.headers.update({'Host': 'office.chaoxing.com'})
-        suc = s.submit(times, roomid, seatid, action)
-        if suc:
-            return
+    # 使用ThreadPoolExecutor来并行化登录和预约过程
+    with ThreadPoolExecutor(max_workers=len(users)) as executor:
+        # 准备任务列表
+        futures = []
+        for index, user in enumerate(users):
+            # 将每个用户的登录和预约作为一个任务提交到线程池
+            futures.append(
+                executor.submit(login_and_reserve_single_user, user, usernames.split(',')[index] if action else None,
+                                passwords.split(',')[index] if action else None, action))
 
-def get_roomid(args1, args2):
-    username = input("请输入用户名：")
-    password = input("请输入密码：")
-    s = reserve(sleep_time=SLEEPTIME, max_attempt=MAX_ATTEMPT, enable_slider=ENABLE_SLIDER, reserve_next_day=RESERVE_NEXT_DAY)
-    s.get_login_status()
-    s.login(username=username, password=password)
-    s.requests.headers.update({'Host': 'office.chaoxing.com'})
-    encode = input("请输入deptldEnc：")
-    s.roomid(encode)
+        # 等待所有任务完成，并收集结果
+        success_list = [future.result() for future in futures]
 
+    # 打印成功列表
+    print(f"Success list: {success_list}")
 
+# 当此脚本被直接运行时，以下代码块将被执行
 if __name__ == "__main__":
+    # 获取当前脚本的绝对路径，并构造配置文件的路径
     config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    # 创建一个 ArgumentParser 对象，用于处理命令行参数
     parser = argparse.ArgumentParser(prog='Chao Xing seat auto reserve')
-    parser.add_argument('-u','--user', default=config_path, help='user config file')
-    parser.add_argument('-m','--method', default="reserve" ,choices=["reserve", "debug", "room"], help='for debug')
-    parser.add_argument('-a','--action', action="store_true",help='use --action to enable in github action')
+    # 添加命令行参数选项
+    # '-u' 或 '--user' 选项，用于指定用户配置文件，默认为 config.json
+    parser.add_argument('-u', '--user', default=config_path, help='user config file')
+    # '-m' 或 '--method' 选项，用于指定执行方法，默认为 "reserve"，可选值为 "reserve", "debug", "room"
+    parser.add_argument('-m', '--method', default="reserve", choices=["reserve"], help='for debug')
+    # '-a' 或 '--action' 选项，如果使用此选项，将设置 action 为 True，用于在 GitHub Actions 中启用
+    parser.add_argument('-a', '--action', action="store_true", help='use --action to enable in github action')
+    # 解析命令行参数
     args = parser.parse_args()
-    func_dict = {"reserve": main, "debug":debug, "room": get_roomid}
+    # 定义一个函数字典，将方法名映射到对应的函数
+    func_dict = {"reserve": main_parallel}  # 使用并行化的main函数
+    # func_dict = {"reserve": main}
+
+    # 打开用户配置文件，读取配置信息
     with open(args.user, "r+") as data:
         usersdata = json.load(data)["reserve"]
+    # 根据命令行参数指定的方法，调用相应的函数，并传入用户配置数据和 action 标志
     func_dict[args.method](usersdata, args.action)
+
+
+
