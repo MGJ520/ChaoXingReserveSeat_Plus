@@ -39,36 +39,16 @@ pip install numpy, opencv-python
 
 其中的`id=5483`的5483即为对应图书馆的id，将其填写到config.json中，座位联网后自己挑即可（详细填写参见后面的setting）
 
-#### 3、running
 
-由于脚本是检测系统时间为7点时进行预约（在main.py 第16行），如果有特殊要求可以修改。通过 `python main.py` 运行脚本, 添加参数 `-u config.json` 来指明配置文件路径
-
-- windows环境下：
-
-windows下使用时间任务:
-
-![](https://zideapicbed.oss-cn-shanghai.aliyuncs.com/QQ%E5%9B%BE%E7%89%8720221120213736.png)
-
-请你用SYSTEM用户运行，设置无需用户登录执行
-
-注意在预约时间后1min内，启动该代码
-
-### github actions部署方式（目前应该没有问题了）：
+### 3、Win部署方式（目前应该没有问题了）：
 
   这种方式可以不需要在本地部署环境，只需要把fork该仓库并修改配置文件即可。
 
-1.**fork该仓库**
+1.**下载代码**
 
 2.**修改config.json**：这个仿照之前的方式进行修改即可，但是注意，username和password请留空或者随便填以防止泄漏个人账号密码。（具体的需要填写在自己repo的settings中）。时间什么也是需要修改（修改到仓库中）不要忘记。
 
 3.**配置账号密码**：在settings->secrets and variables->Repository secrets 创建两个secret keys。名称分别为USERNAMES，PASSWORDS，填写自己的账号和密码即可。（如果有多个用户，请使用,(英文逗号)隔开，如果密码中有逗号可能会出现问题）。
-
-```
-xxxxxxx,xxxxxxx
-```
-
-4.**运行action**：在action -> auto_reserve -> run workflows 选择main分支即可。
-
 
 ## config配置
 之后编辑config.json并填写座位预约相关信息即可
@@ -91,7 +71,17 @@ xxxxxxx,xxxxxxx
     }
 }
 ```
-参考前面的运行方式即可。
+由于脚本是检测系统时间为7点时进行预约（在main.py 第16行），如果有特殊要求可以修改。通过 `python main.py` 运行脚本, 添加参数 `-u config.json` 来指明配置文件路径
+
+- windows环境下：
+
+windows下使用时间任务:
+
+![](https://zideapicbed.oss-cn-shanghai.aliyuncs.com/QQ%E5%9B%BE%E7%89%8720221120213736.png)
+
+请你用SYSTEM用户运行，设置无需用户登录执行
+
+注意在预约时间后1min内，启动该代码
 
 
 ## 高级设置
